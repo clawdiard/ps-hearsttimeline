@@ -82,6 +82,16 @@ footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);co
 .decade-metric .metric-note{font-size:0.7rem;color:var(--muted);font-style:italic;margin-top:6px;opacity:0.7}
 @media(max-width:480px){.decade-metrics{grid-template-columns:1fr}}
 
+/* Chart Overlay */
+.chart-toggle{position:fixed;bottom:24px;right:24px;z-index:100;background:var(--accent);color:var(--bg);border:none;padding:12px 20px;font-family:inherit;font-size:0.8rem;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;transition:all 0.3s;box-shadow:0 4px 20px rgba(201,165,90,0.3)}
+.chart-toggle:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(201,165,90,0.4)}
+.chart-toggle.active{background:var(--surface);color:var(--accent);border:1px solid var(--accent)}
+.chart-overlay{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:99;width:min(90vw,800px);background:var(--surface);border:1px solid var(--accent2);padding:24px 24px 16px;opacity:0;pointer-events:none;transition:all 0.4s ease;box-shadow:0 8px 40px rgba(0,0,0,0.6)}
+.chart-overlay.visible{opacity:1;pointer-events:auto}
+.chart-overlay h3{font-size:0.8rem;color:var(--accent);letter-spacing:0.15em;text-transform:uppercase;margin-bottom:16px;font-weight:400;text-align:center}
+.chart-overlay canvas{width:100%!important;max-height:280px}
+.chart-overlay .chart-note{font-size:0.65rem;color:var(--muted);text-align:center;margin-top:10px;font-style:italic}
+
 /* Scroll animation */
 .event-content{opacity:0;transform:translateY(20px)}
 .event-content.visible{opacity:1;transform:translateY(0)}
@@ -422,10 +432,18 @@ footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);co
 
 </div>
 
+<button class="chart-toggle" id="chartToggle">📊 Acquisition Chart</button>
+<div class="chart-overlay" id="chartOverlay">
+  <h3>Cumulative Acquisition Spending by Decade</h3>
+  <canvas id="acquisitionChart"></canvas>
+  <div class="chart-note">Estimated values based on publicly reported deals and historical analysis. Adjusted for inflation where noted.</div>
+</div>
+
 <footer>
   <p>The Timeline — A Visual History of 137 Years of Media Empire</p>
 </footer>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script>
 // Decade summary toggle
 document.querySelectorAll('.decade-summary-toggle').forEach(btn=>{
@@ -450,6 +468,37 @@ const obs=new IntersectionObserver(entries=>{
   entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible')});
 },{threshold:0.1});
 document.querySelectorAll('.event-content').forEach(el=>obs.observe(el));
+
+// Chart toggle
+const chartToggle=document.getElementById('chartToggle');
+const chartOverlay=document.getElementById('chartOverlay');
+let chartInstance=null;
+chartToggle.addEventListener('click',()=>{
+  const show=!chartOverlay.classList.contains('visible');
+  chartOverlay.classList.toggle('visible',show);
+  chartToggle.classList.toggle('active',show);
+  if(show&&!chartInstance){
+    const decades=['1890s','1900s','1910s','1920s','1930s','1940s','1950s','1960s','1970s','1980s','1990s','2000s','2010s','2020s'];
+    const spending=[0.5,2,5,15,3,1,2,8,12,350,600,1200,2500,800];
+    const cumulative=[];spending.reduce((a,v,i)=>{cumulative[i]=a+v;return cumulative[i]},0);
+    const ctx=document.getElementById('acquisitionChart').getContext('2d');
+    chartInstance=new Chart(ctx,{
+      type:'bar',
+      data:{
+        labels:decades,
+        datasets:[
+          {type:'bar',label:'Decade Spending ($M)',data:spending,backgroundColor:'rgba(201,165,90,0.35)',borderColor:'rgba(201,165,90,0.8)',borderWidth:1,borderRadius:2,order:2},
+          {type:'line',label:'Cumulative ($M)',data:cumulative,borderColor:'#c9a55a',backgroundColor:'rgba(201,165,90,0.08)',fill:true,tension:0.3,pointRadius:3,pointBackgroundColor:'#c9a55a',order:1}
+        ]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{color:'#8a8a9a',font:{size:11,family:'Georgia'}},position:'top'},tooltip:{backgroundColor:'#16161f',borderColor:'#c9a55a',borderWidth:1,titleColor:'#c9a55a',bodyColor:'#e8e6e3',callbacks:{label:function(c){return c.dataset.label+': $'+c.parsed.y.toLocaleString()+'M'}}}},
+        scales:{x:{ticks:{color:'#8a8a9a',font:{size:10}},grid:{color:'rgba(30,30,46,0.5)'}},y:{ticks:{color:'#8a8a9a',font:{size:10},callback:v=>'$'+v.toLocaleString()+'M'},grid:{color:'rgba(30,30,46,0.5)'}}}
+      }
+    });
+  }
+});
 </script>
 </body>
 </html>
