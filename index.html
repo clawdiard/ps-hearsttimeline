@@ -92,6 +92,24 @@ footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);co
 .chart-overlay canvas{width:100%!important;max-height:280px}
 .chart-overlay .chart-note{font-size:0.65rem;color:var(--muted);text-align:center;margin-top:10px;font-style:italic}
 
+/* Sector Breakdown */
+.sector-toggle{position:fixed;bottom:24px;right:220px;z-index:100;background:var(--accent);color:var(--bg);border:none;padding:12px 20px;font-family:inherit;font-size:0.8rem;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;transition:all 0.3s;box-shadow:0 4px 20px rgba(201,165,90,0.3)}
+.sector-toggle:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(201,165,90,0.4)}
+.sector-toggle.active{background:var(--surface);color:var(--accent);border:1px solid var(--accent)}
+.sector-overlay{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:99;width:min(90vw,900px);background:var(--surface);border:1px solid var(--accent2);padding:24px;opacity:0;pointer-events:none;transition:all 0.4s ease;box-shadow:0 8px 40px rgba(0,0,0,0.6)}
+.sector-overlay.visible{opacity:1;pointer-events:auto}
+.sector-overlay h3{font-size:0.8rem;color:var(--accent);letter-spacing:0.15em;text-transform:uppercase;margin-bottom:8px;font-weight:400;text-align:center}
+.sector-era-nav{display:flex;justify-content:center;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+.sector-era-nav button{background:var(--card);border:1px solid var(--border);color:var(--muted);padding:6px 12px;font-family:inherit;font-size:0.7rem;cursor:pointer;letter-spacing:0.06em;text-transform:uppercase;transition:all 0.3s}
+.sector-era-nav button:hover,.sector-era-nav button.active{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+.sector-charts{display:flex;align-items:center;gap:24px}
+.sector-donut{flex:0 0 260px;height:260px;position:relative}
+.sector-legend{flex:1;display:flex;flex-direction:column;gap:6px}
+.sector-legend-item{display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--muted)}
+.sector-legend-item .swatch{width:12px;height:12px;border-radius:2px;flex-shrink:0}
+.sector-legend-item .pct{color:var(--accent);font-weight:600;min-width:36px;text-align:right}
+@media(max-width:600px){.sector-charts{flex-direction:column}.sector-donut{flex:0 0 200px;width:200px;height:200px}}
+
 /* Scroll animation */
 .event-content{opacity:0;transform:translateY(20px)}
 .event-content.visible{opacity:1;transform:translateY(0)}
@@ -432,6 +450,23 @@ footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);co
 
 </div>
 
+<button class="sector-toggle" id="sectorToggle">🏢 Sector Mix</button>
+<div class="sector-overlay" id="sectorOverlay">
+  <h3>Business Sector Evolution</h3>
+  <div class="sector-era-nav" id="sectorEraNav">
+    <button class="active" data-era="1890s">1890s</button>
+    <button data-era="1920s">1920s</button>
+    <button data-era="1950s">1950s</button>
+    <button data-era="1980s">1980s</button>
+    <button data-era="2000s">2000s</button>
+    <button data-era="2024">2024</button>
+  </div>
+  <div class="sector-charts">
+    <div class="sector-donut"><canvas id="sectorDonut"></canvas></div>
+    <div class="sector-legend" id="sectorLegend"></div>
+  </div>
+</div>
+
 <button class="chart-toggle" id="chartToggle">📊 Acquisition Chart</button>
 <div class="chart-overlay" id="chartOverlay">
   <h3>Cumulative Acquisition Spending by Decade</h3>
@@ -498,6 +533,49 @@ chartToggle.addEventListener('click',()=>{
       }
     });
   }
+});
+
+// Sector Breakdown
+const sectorData={
+  '1890s':{labels:['Newspapers'],values:[100],colors:['#c9a55a']},
+  '1920s':{labels:['Newspapers','Magazines','Film/Newsreels','Real Estate'],values:[55,25,12,8],colors:['#c9a55a','#8b6914','#5e8b9b','#9b6b5e']},
+  '1950s':{labels:['Newspapers','Magazines','TV & Radio','Real Estate','Timber/Mining'],values:[35,30,20,10,5],colors:['#c9a55a','#8b6914','#5e8b9b','#9b6b5e','#6b9b5e']},
+  '1980s':{labels:['Magazines','Newspapers','TV & Cable','Real Estate','B2B/Other'],values:[30,20,30,12,8],colors:['#8b6914','#c9a55a','#5e8b9b','#9b6b5e','#8b5e9b']},
+  '2000s':{labels:['TV & Cable','Magazines','B2B Data','Newspapers','Digital','Financial (Fitch)'],values:[28,22,15,10,10,15],colors:['#5e8b9b','#8b6914','#8b5e9b','#c9a55a','#6b9b5e','#9b6b5e']},
+  '2024':{labels:['B2B Data & Healthcare','TV & Cable','Magazines & Digital','Financial Services','Newspapers','Automotive/Other'],values:[30,22,18,14,6,10],colors:['#8b5e9b','#5e8b9b','#8b6914','#9b6b5e','#c9a55a','#6b9b5e']}
+};
+let sectorChart=null;
+const sectorToggle=document.getElementById('sectorToggle');
+const sectorOverlay=document.getElementById('sectorOverlay');
+const sectorLegend=document.getElementById('sectorLegend');
+
+function renderSector(era){
+  const d=sectorData[era];
+  const ctx=document.getElementById('sectorDonut').getContext('2d');
+  if(sectorChart)sectorChart.destroy();
+  sectorChart=new Chart(ctx,{
+    type:'doughnut',
+    data:{labels:d.labels,datasets:[{data:d.values,backgroundColor:d.colors,borderColor:'#0a0a0f',borderWidth:2,hoverBorderColor:'#c9a55a'}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,cutout:'55%',
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#16161f',borderColor:'#c9a55a',borderWidth:1,titleColor:'#c9a55a',bodyColor:'#e8e6e3',callbacks:{label:function(c){return c.label+': '+c.parsed+'%'}}}}
+    }
+  });
+  sectorLegend.innerHTML=d.labels.map((l,i)=>`<div class="sector-legend-item"><span class="swatch" style="background:${d.colors[i]}"></span><span class="pct">${d.values[i]}%</span><span>${l}</span></div>`).join('');
+}
+
+sectorToggle.addEventListener('click',()=>{
+  const show=!sectorOverlay.classList.contains('visible');
+  sectorOverlay.classList.toggle('visible',show);
+  sectorToggle.classList.toggle('active',show);
+  if(show&&!sectorChart)renderSector('1890s');
+});
+
+document.getElementById('sectorEraNav').addEventListener('click',e=>{
+  if(e.target.tagName!=='BUTTON')return;
+  document.querySelectorAll('#sectorEraNav button').forEach(b=>b.classList.remove('active'));
+  e.target.classList.add('active');
+  renderSector(e.target.dataset.era);
 });
 </script>
 </body>
